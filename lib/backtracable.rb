@@ -1,4 +1,5 @@
 require "backtracable/version"
+require "logger"
 
 module Backtracable
   
@@ -9,46 +10,24 @@ module Backtracable
   end
   
   module InstanceMethods
-    def backtrace(exception: nil, logger: Rails.logger, method: :warn)
-      exception.nil? ?
-        backtrace_info(logger, method) :
-        backtrace_via_exception(exception, logger, method)
+    def logger
+      @logger ||= Logger.new(STDOUT)
+    end
+    
+    def callstack(e)
+      if e.nil?
+        caller
+          .tap { |stack| stack.shift }
+          .tap { |stack| stack.unshift("#{'>' * 10} STACKTRACE [TOP] #{'>' * 10}") }
+          .tap { |stack| stack.push("#{'>' * 10} STACKTRACE [BOTTOM] #{'>' * 10}") }
+      else
+        e.backtrace
+      end
     end
 
-    def backtrace_via_exception(e, logger, method)
-      logger.send(method, "#{e.class}: #{e.message}")
-      logger.send(method, e.backtrace.join("\n"))
-    end
-
-    def backtrace_info(logger, method)
-      stack = caller
-        .tap {|stack| stack.shift}
-        .tap {|stack| stack.unshift("#{'>' * 10} STACKTRACE [TOP] #{'>' * 10}")}
-        .tap {|stack| stack.push("#{'>' * 10} STACKTRACE [BOTTOM] #{'>' * 10}")}
-      logger.send(method, stack.join("\n"))
+    def backtrace(exception: nil)
+      logger.warn callstack(exception).join("\n")
     end
   end
   
 end
-
-
-=begin
-class SomeClass
-
-  include Backtracable
-
-  def some_method
-    # Dump backtrace to the logger. (default: Rails.logger)
-    backtrace(method: :debug)
-  end
-
-  def some_method_handling_exception
-
-    # do something ...
-
-  rescue RuntimeError => e
-    backtrace(exception: e)
-  end
-
-end
-=end
